@@ -13,5 +13,5 @@ if __name__ == "__main__":
     seq = SeqIO.parse(fasta, 'fasta')
 
     for item in seq:
-        print(item)
+        print(item.seq)
 
