@@ -9,5 +9,9 @@ if __name__ == "__main__":
     parser.add_argument('--fastafile')
     args = parser.parse_args()
     fasta = args.fastafile
-    print(fasta)
+
+    seq = SeqIO.parse(fasta, 'fasta')
+
+    for item in seq:
+        print(item)
 
