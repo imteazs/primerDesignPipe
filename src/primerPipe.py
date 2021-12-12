@@ -4,11 +4,11 @@ import primer3 as primer
 import argparse
 import csv
 
-def primerDesign(seqRec):
+def primerDesign(seqRec, start, length):
     inputDict = {
                     'SEQUENCE_ID': seqRec.id,
                     'SEQUENCE_TEMPLATE': str(seqRec.seq),
-                    'SEQUENCE_INCLUDED_REGION': [100,500]
+                    'SEQUENCE_INCLUDED_REGION': [start,length]
                 }
     designSettings = {
                         'PRIMER_OPT_SIZE': 20,
@@ -47,12 +47,17 @@ if __name__ == "__main__":
     '''
     Creating argument parser so that command line arguments can be passed
     - First for getting path of the fasta file.
-    - Still thinking about additional parameters to pass.
+    - adding fields for included region.
+    - possibly adding in a field for out directory
     '''
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fastafile')
+    parser.add_argument('--fastafile', help='Path to fasta file')
+    parser.add_argument('--included_region_start', help='start position of subregion', type=int)
+    parser.add_argument('--included_region_length', help='length of subregion', type=int)
     args = parser.parse_args()
     fasta = args.fastafile
+    include_reg_start = args.included_region_start
+    include_reg_len = args.included_region_length
 
     # creating SeqIO biopython object
     seq = SeqIO.parse(fasta, 'fasta')
@@ -64,7 +69,7 @@ if __name__ == "__main__":
       be able to handle it.
     '''
     for record in seq:
-        design = primerDesign(record)
+        design = primerDesign(record, include_reg_start, include_reg_len)
         #resultdf = primerFilter(design)
 
 
