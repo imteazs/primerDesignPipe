@@ -2,12 +2,13 @@ import pandas as pd
 from Bio import SeqIO
 import primer3 as primer
 import argparse
+import csv
 
 def primerDesign(seqRec):
     inputDict = {
                     'SEQUENCE_ID': seqRec.id,
                     'SEQUENCE_TEMPLATE': str(seqRec.seq),
-                    'SEQUENCE_INCLUDED_REGION': [36,342]
+                    'SEQUENCE_INCLUDED_REGION': [100,500]
                 }
     designSettings = {
                         'PRIMER_OPT_SIZE': 20,
@@ -33,13 +34,20 @@ def primerDesign(seqRec):
     }
     oligo = primer.designPrimers(inputDict, designSettings)
     for key, value in oligo.items():
-        print(key, ':', value)
+        print(key, ',', value)
+    return oligo
+
+def primerFilter(primerList):
+    data = pd.DataFrame(primerList)
+    finalData = None
+    return finalData
 
 
 if __name__ == "__main__":
     '''
     Creating argument parser so that command line arguments can be passed
-    - First for getting path of the fasta file
+    - First for getting path of the fasta file.
+    - Still thinking about additional parameters to pass.
     '''
     parser = argparse.ArgumentParser()
     parser.add_argument('--fastafile')
@@ -49,6 +57,15 @@ if __name__ == "__main__":
     # creating SeqIO biopython object
     seq = SeqIO.parse(fasta, 'fasta')
 
+    '''
+    * This is code is designed to run bulk requests, so it can be used to design primers
+      for either qPCR or sequencing applications.
+    * Just provide fasta with either multiple genes or single genes. The program should
+      be able to handle it.
+    '''
     for record in seq:
-        primerDesign(record)
+        design = primerDesign(record)
+        #resultdf = primerFilter(design)
+
+
 
