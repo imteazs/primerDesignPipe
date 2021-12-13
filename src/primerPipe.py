@@ -72,10 +72,19 @@ def genDF(primerList):
             finalData['product_size'][idx] = data[0][index]
 
     finalData['oligo_size'] = finalData['oligo'].str.len()
+    print(finalData)
     return finalData
 
 
 def addCalc(primDF):
+    restrict_enz = {
+        'CviAII': ['CATG', 'GTAC'],
+        'FatI': ['CATG', 'GTAC'],
+        'Hpy188III' : ['TCNNGA', 'AGNNCT'],
+        'NlaIII': ['CATG', 'GTAC'],
+        'CviQI': ['GTAC', 'CATG'],
+        'RsaI': ['GTAC', 'CATG']
+    }
     return None
 
 
