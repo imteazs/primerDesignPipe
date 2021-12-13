@@ -49,7 +49,6 @@ def genDF(primerList):
     """
     data = pd.DataFrame(primerList)
     data = data.T
-    data.to_csv('~/Documents/testdata/test.csv')
     finalData = pd.DataFrame(columns=['oligo', 'id', 'type', 'oligo_size', 'product_size', 'Tm', 'GC_pct'])
     for index, row in data.iterrows():
         rowname_split = row.name.split('_')
