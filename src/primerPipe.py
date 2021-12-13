@@ -73,8 +73,11 @@ def genDF(primerList):
             finalData['product_size'][idx] = data[0][index]
 
     finalData['oligo_size'] = finalData['oligo'].str.len()
-    print(finalData)
     return finalData
+
+
+def addCalc(primDF):
+    return None
 
 
 if __name__ == "__main__":
