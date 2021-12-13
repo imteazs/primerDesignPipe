@@ -6,6 +6,8 @@ import argparse
 
 def primerDesign(seqRec, start, length):
     """
+    Take seq record and run through primer3 pipeline along with data to
+    determine window where primers will be designed.
     :param seqRec: record from the fasta file
     :param start: base position of interest
     :param length: length of the window of interest
