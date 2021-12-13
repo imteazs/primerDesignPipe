@@ -36,7 +36,7 @@ def primerDesign(seqRec, start, length):
         'PRIMER_MAX_SELF_END': 8,
         'PRIMER_PAIR_MAX_COMPL_ANY': 12,
         'PRIMER_PAIR_MAX_COMPL_END': 8,
-        'PRIMER_PRODUCT_SIZE_RANGE': [[80, 100]]
+        'PRIMER_PRODUCT_SIZE_RANGE': [[90, 100]]
     }
     oligo = primer.designPrimers(inputDict, designSettings)
     return oligo
@@ -50,7 +50,7 @@ def genDF(primerList):
     data = pd.DataFrame(primerList)
     data = data.T
     data.to_csv('~/Documents/testdata/test.csv')
-    finalData = pd.DataFrame(columns=['oligo', 'id', 'type', 'oligo_size', 'product_size'])
+    finalData = pd.DataFrame(columns=['oligo', 'id', 'type', 'oligo_size', 'product_size', 'Tm', 'GC_pct'])
     for index, row in data.iterrows():
         rowname_split = row.name.split('_')
 
@@ -58,12 +58,22 @@ def genDF(primerList):
             # ['PRIMER', 'LEFT', '0', 'SEQUENCE']
             nrow = {'oligo' : data[0][index], 'id': rowname_split[2], 'type': rowname_split[1]}
             finalData = finalData.append(nrow, ignore_index=True)
+        elif 'tm' in row.name.lower():
+            idx = finalData.index[
+                (finalData['type'] == rowname_split[1]) & (finalData['id'] == rowname_split[2])].tolist()
+            finalData['Tm'][idx] = data[0][index]
+
+        elif 'gc_percent' in row.name.lower():
+            idx = finalData.index[
+                (finalData['type'] == rowname_split[1]) & (finalData['id'] == rowname_split[2])].tolist()
+            finalData['GC_pct'][idx] = data[0][index]
 
         elif 'pair' in row.name.lower():
             idx = finalData.index[finalData['id'] == rowname_split[2]].tolist()
             finalData['product_size'][idx] = data[0][index]
 
     finalData['oligo_size'] = finalData['oligo'].str.len()
+    print(finalData)
     return finalData
 
 
