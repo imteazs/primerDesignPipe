@@ -96,7 +96,6 @@ def addCalc(primDF):
         else:
             for item in value:
                 primDF[key] = primDF['oligo'].str.contains(item, regex=False)
-
     primDF['restric_enz_hit'] = primDF[restrict_enz.keys()].any(axis=1)
 
 
