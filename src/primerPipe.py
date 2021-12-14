@@ -73,12 +73,14 @@ def genDF(primerList):
             idx = finalData.index[finalData['id'] == rowname_split[2]].tolist()
             finalData['product_size'][idx] = data[0][index]
 
-    finalData['oligo_size'] = finalData['oligo'].str.len()
+    finalData['primer_len'] = finalData['oligo'].str.len()
     return finalData
 
 
 def addCalc(primDF):
     primDF['Tm_calc'] = primDF['oligo'].apply(primer3.calcTm, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+    primDF['Homodimer_thermo'] = primDF['oligo'].apply(primer3.calcHomodimer, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200, temp_c=60)
+    primDF['Homodimer_delG_kcal/mol'] = [i.dg/1000 for i in primDF['Homodimer_thermo'].values]
 
     restrict_enz = {
         'CviAII': ['CATG'],
@@ -95,8 +97,7 @@ def addCalc(primDF):
             for item in value:
                 primDF[key] = primDF['oligo'].str.contains(item, regex=False)
 
-
-    return primDF
+    primDF['restric_enz_hit'] = primDF[restrict_enz.keys()].any(axis=1)
 
 
 if __name__ == "__main__":
