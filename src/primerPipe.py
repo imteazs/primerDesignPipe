@@ -1,7 +1,9 @@
 import pandas as pd
+import primer3
 from Bio import SeqIO
 import primer3 as primer
 import argparse
+import re
 
 
 def primerDesign(seqRec, start, length):
@@ -38,7 +40,8 @@ def primerDesign(seqRec, start, length):
         'PRIMER_MAX_SELF_END': 8,
         'PRIMER_PAIR_MAX_COMPL_ANY': 12,
         'PRIMER_PAIR_MAX_COMPL_END': 8,
-        'PRIMER_PRODUCT_SIZE_RANGE': [[90, 100]]
+        'PRIMER_PRODUCT_SIZE_RANGE': [[90, 100]],
+        'PRIMER_MAX_END_GC': 0
     }
     oligo = primer.designPrimers(inputDict, designSettings)
     return oligo
@@ -46,12 +49,13 @@ def primerDesign(seqRec, start, length):
 
 def genDF(primerList):
     """
+    Take the primer3 dataframe and parse through it and transfer select data to a
     :param primerList: primer3 dictionary object
     :return: preprocessed dataframe to be ready for further processing
     """
     data = pd.DataFrame(primerList)
     data = data.T
-    finalData = pd.DataFrame(columns=['oligo', 'id', 'type', 'oligo_size', 'product_size', 'Tm', 'GC_pct'])
+    finalData = pd.DataFrame(columns=['oligo', 'id', 'type', 'oligo_size', 'product_size', 'GC_pct'])
     for index, row in data.iterrows():
         rowname_split = row.name.split('_')
 
@@ -59,10 +63,6 @@ def genDF(primerList):
             # ['PRIMER', 'LEFT', '0', 'SEQUENCE']
             nrow = {'oligo' : data[0][index], 'id': rowname_split[2], 'type': rowname_split[1]}
             finalData = finalData.append(nrow, ignore_index=True)
-        elif 'tm' in row.name.lower():
-            idx = finalData.index[
-                (finalData['type'] == rowname_split[1]) & (finalData['id'] == rowname_split[2])].tolist()
-            finalData['Tm'][idx] = data[0][index]
 
         elif 'gc_percent' in row.name.lower():
             idx = finalData.index[
@@ -74,20 +74,29 @@ def genDF(primerList):
             finalData['product_size'][idx] = data[0][index]
 
     finalData['oligo_size'] = finalData['oligo'].str.len()
-    print(finalData)
     return finalData
 
 
 def addCalc(primDF):
+    primDF['Tm_calc'] = primDF['oligo'].apply(primer3.calcTm, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+
     restrict_enz = {
-        'CviAII': ['CATG', 'GTAC'],
-        'FatI': ['CATG', 'GTAC'],
-        'Hpy188III' : ['TCNNGA', 'AGNNCT'],
-        'NlaIII': ['CATG', 'GTAC'],
-        'CviQI': ['GTAC', 'CATG'],
-        'RsaI': ['GTAC', 'CATG']
+        'CviAII': ['CATG'],
+        'FatI': ['CATG'],
+        'Hpy188III': ['TCNNGA'],
+        'NlaIII': ['CATG'],
+        'CviQI': ['GTAC'],
+        'RsaI': ['GTAC']
     }
-    return None
+    for key, value in restrict_enz.items():
+        if 'Hpy188III' in key:
+            primDF[key] = primDF['oligo'].str.contains('TC..GA')
+        else:
+            for item in value:
+                primDF[key] = primDF['oligo'].str.contains(item, regex=False)
+
+
+    return primDF
 
 
 if __name__ == "__main__":
@@ -103,7 +112,7 @@ if __name__ == "__main__":
     parser.add_argument('--included_region_length', help='length of subregion', type=int)
     parser.add_argument('--mv_cations', help='Concentration of monovalent cations in mM', type=float)
     parser.add_argument('--dv_cations', help='concentration of divalent cations in mM', type=float)
-    parser.add_argument('--dntp', help='concentration of dntps in uM', type=float)
+    parser.add_argument('--dntp', help='concentration of dntps in mM [according to primer3 python docs]', type=float)
     parser.add_argument('--DNA', help='concentration of DNA in nM', type=float)
     parser.add_argument('--anneal_temp', help='annealing temp in C', type=float)
 
@@ -124,3 +133,5 @@ if __name__ == "__main__":
     for record in seq:
         design = primerDesign(record, include_reg_start, include_reg_len)
         resultdf = genDF(design)
+        selectdf = addCalc(resultdf)
+
