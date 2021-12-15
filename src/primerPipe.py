@@ -79,6 +79,7 @@ def genDF(primerList):
             finalData['position'][idx] = value[0]
             finalData['primer_len'][idx] = value[1]
 
+    print('Primer3 data transferred to dataframe')
     return finalData
 
 
@@ -115,6 +116,9 @@ def addCalc(primDF):
             for item in value:
                 primDF[key] = primDF['oligo'].str.contains(item, regex=False)
     primDF['restric_enz_hit'] = primDF[restrict_enz.keys()].any(axis=1)
+
+    '''Find more than three repeats'''
+    primDF['3_plus_repeats'] = primDF['oligo'].str.contains(r'((\w)\2{3,})')
 
     '''
     Count how many Gs and Cs in the last bases of the oligos
@@ -167,11 +171,17 @@ def addCalc(primDF):
 
     mergedf['restric_enz_hit_all'] = mergedf[['restric_enz_hit_left', 'restric_enz_hit_right', 'restric_enz_hit']].any(axis=1)
     mergedf.to_csv('~/Documents/testdata/final.csv')
+
+    print('Primer calculations completed')
     return mergedf
 
 
 def pickPrimer(calcdf):
-    #calcdf['recom']
+    #remove rows where the enzymes can hit any sites
+    finaldf = calcdf[calcdf['restric_enz_hit_all'] == False]
+
+
+
     return None
 
 
@@ -192,6 +202,7 @@ if __name__ == "__main__":
     parser.add_argument('--dntp', help='concentration of dntps in mM [according to primer3 python docs]', type=float)
     parser.add_argument('--DNA', help='concentration of DNA in nM', type=float)
     parser.add_argument('--anneal_temp', help='annealing temp in C', type=float)
+    parser.add_argument('--out_path', help='Path to output including full file name')
 
     args = parser.parse_args()
     fasta = args.fastafile
