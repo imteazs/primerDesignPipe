@@ -162,7 +162,6 @@ def addCalc(primDF):
 
     mergedf.drop(columns=['left_right_heterodimer_thermo', 'left_internal_heterodimer_thermo',
                           'internal_right_heterodimer_thermo'], inplace=True)
-    mergedf.to_csv('~/Documents/testdata/final.csv')
 
     return mergedf
 
