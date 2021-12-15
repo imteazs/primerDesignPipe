@@ -89,10 +89,10 @@ def addCalc(primDF):
     :param primDF: dataframe from the primer pipeline
     :return: primer after calculations
     """
-    '''
-    Calculate the homodimer of each oligo and get their deltaG and Tm in C
-    '''
+    '''Calculate the Tm of all oligos in C'''
     primDF['Tm_calc'] = primDF['oligo'].apply(primer3.calcTm, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+
+    '''Calculate the homodimer of each oligo and get their deltaG and Tm in C'''
     primDF['Homodimer_thermo'] = primDF['oligo'].apply(primer3.calcHomodimer, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
     primDF['Homodimer_delG_kcal/mol'] = [i.dg/1000 for i in primDF['Homodimer_thermo'].values]
     primDF['Homodimer_Tm_C'] = [i.tm for i in primDF['Homodimer_thermo'].values]
@@ -130,9 +130,7 @@ def addCalc(primDF):
     primDF = primDF.drop(columns=['Homodimer_thermo', 'last_5_base'])
     primDF = primDF.drop(columns=restrict_enz.keys())
 
-    '''
-    Split the dataframe up into primer type
-    '''
+    '''Split the dataframe up into primer type'''
     left = primDF[primDF['type'] == 'LEFT']
     left.drop(columns=['type'], inplace=True)
 
@@ -143,11 +141,9 @@ def addCalc(primDF):
     internal.drop(columns=['type'], inplace=True)
 
     '''Merge all the data into one assay id per row'''
-    mergedf = left.merge(right, on=['id'], suffixes=['_left', '_right']).merge(internal, on=['id'], suffixes=['_left','_internal'])
+    mergedf = left.merge(right, on=['id'], suffixes=['_left', '_right']).merge(internal, on=['id'], suffixes=['_left', '_internal'])
 
-    '''
-    Calculate the heterodimers ie forward and reverse and probes deltaG and Tm in C
-    '''
+    '''Calculate the heterodimers ie forward and reverse and probes deltaG and Tm in C'''
     #left and right
     mergedf['left_right_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
                                                 for i, j in mergedf[['oligo_left', 'oligo_right']].values]
@@ -177,6 +173,11 @@ def addCalc(primDF):
 
 
 def pickPrimer(calcdf):
+    '''
+    Get the calculations and then perform the filtering steps and get final candidates of assays
+    :param calcdf:
+    :return: finaldf
+    '''
     #remove rows where the enzymes can hit any sites
     finaldf = calcdf[calcdf['restric_enz_hit_all'] == False]
 
@@ -193,6 +194,15 @@ def pickPrimer(calcdf):
                       (finaldf['left_internal_heterodimer_Tm_C'] < 51) &
                       (finaldf['right_internal_heterodimer_Tm_C'] < 51)]
 
+    if finaldf.empty:
+        print('ERROR: No data in dataframe')
+
+    finaldf = finaldf.sort_values(by=['primer_len_left', 'primer_len_right', 'primer_len', 'Tm_calc_left',
+                                      'Tm_calc_right', 'Tm_calc'])
+
+    finaldf = finaldf[['id', 'oligo_left', 'oligo_right', 'oligo',
+                       'Tm_calc_left', 'Tm_calc_right', 'Tm_calc',
+                       'Homodimer_Tm_C_left', 'Homodimer_Tm_C_right', 'Homodimer_Tm_C']]
     return finaldf
 
 
@@ -236,9 +246,9 @@ if __name__ == "__main__":
         resultdf = genDF(design) #transfer designs to a dataframe
         calcprimdf = addCalc(resultdf) #calculate hetero and homo dimers, and search for restriction sites
         rawfile = outpath + '/' + record.id + '_raw' + '.csv'
-        calcprimdf.to_csv(rawfile)
+        calcprimdf.to_csv(rawfile, index=False)
         finalPrim = pickPrimer(calcprimdf) #pick primers
         finalfile = outpath + '/' + record.id + '_final' + '.csv'
-        finalPrim.to_csv(finalfile)
+        finalPrim.to_csv(finalfile, index=False) #Final output for the record
 
 
