@@ -53,6 +53,7 @@ def genDF(primerList):
     """
     data = primerList
     finalData = pd.DataFrame(columns=['id', 'oligo', 'type', 'position', 'primer_len', 'amplicon_size', 'GC_pct'])
+
     for key, value in data.items():
         rowname_split = key.split('_')
 
@@ -139,16 +140,33 @@ def addCalc(primDF):
     mergedf = left.merge(right, on=['id'], suffixes=['_left', '_right']).merge(internal, on=['id'], suffixes=['_left','_internal'])
 
     '''
-    Calculate the left and right heterodimers ie forward and reverse deltaG and Tm in C
+    Calculate the heterodimers ie forward and reverse and probes deltaG and Tm in C
     '''
     mergedf['left_right_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
                                                 for i, j in mergedf[['oligo_left', 'oligo_right']].values]
     mergedf['left_right_heterodimer_kcal/mol'] = [i.dg/1000 for i in mergedf['left_right_heterodimer_thermo'].values]
     mergedf['left_right_heterodimer_Tm_C'] = [i.tm for i in mergedf['left_right_heterodimer_thermo'].values]
-    mergedf.drop(columns='left_right_heterodimer_thermo', inplace=True)
+
+    mergedf['left_internal_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+                                                   for i, j in mergedf[['oligo_left', 'oligo']].values]
+    mergedf['left_internal_heterodimer_kcal/mol'] = [i.dg / 1000 for i in mergedf['left_internal_heterodimer_thermo'].values]
+    mergedf['left_internal_heterodimer_Tm_C'] = [i.tm for i in mergedf['left_internal_heterodimer_thermo'].values]
+
+    mergedf['internal_right_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+                                                    for i, j in mergedf[['oligo', 'oligo_right']].values]
+    mergedf['right_internal_kcal/mol'] = [i.dg / 1000 for i in mergedf['internal_right_heterodimer_thermo'].values]
+    mergedf['right_internal_Tm_C'] = [i.tm for i in mergedf['internal_right_heterodimer_thermo'].values]
+
+    mergedf.drop(columns=['left_right_heterodimer_thermo', 'left_internal_heterodimer_thermo',
+                          'internal_right_heterodimer_thermo'], inplace=True)
     mergedf.to_csv('~/Documents/testdata/final.csv')
 
     return mergedf
+
+
+def pickPrimer(calcdf):
+    return None
+
 
 if __name__ == "__main__":
     '''
