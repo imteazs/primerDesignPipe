@@ -5,7 +5,7 @@ import primer3 as primer
 import argparse
 
 
-def primerDesign(seqRec, start, length):
+def primerDesign(seqRec, start, length, assay_num):
     """
     Take seq record and run through primer3 pipeline along with data to
     determine window where primers will be designed.
@@ -20,6 +20,7 @@ def primerDesign(seqRec, start, length):
         'SEQUENCE_INCLUDED_REGION': [start, length]
     }
     designSettings = {
+        'PRIMER_NUM_RETURN': assay_num,
         'PRIMER_OPT_SIZE': 20,
         'PRIMER_PICK_INTERNAL_OLIGO': 1,
         'PRIMER_INTERNAL_MAX_SELF_END': 8,
@@ -42,6 +43,7 @@ def primerDesign(seqRec, start, length):
         'PRIMER_PRODUCT_SIZE_RANGE': [[90, 100]]
     }
     oligo = primer.designPrimers(inputDict, designSettings)
+    print('Assay sequences generated')
     return oligo
 
 
@@ -163,10 +165,13 @@ def addCalc(primDF):
     mergedf.drop(columns=['left_right_heterodimer_thermo', 'left_internal_heterodimer_thermo',
                           'internal_right_heterodimer_thermo'], inplace=True)
 
+    mergedf['restric_enz_hit_all'] = mergedf[['restric_enz_hit_left', 'restric_enz_hit_right', 'restric_enz_hit']].any(axis=1)
+    mergedf.to_csv('~/Documents/testdata/final.csv')
     return mergedf
 
 
 def pickPrimer(calcdf):
+    #calcdf['recom']
     return None
 
 
@@ -181,6 +186,7 @@ if __name__ == "__main__":
     parser.add_argument('--fastafile', help='Path to fasta file')
     parser.add_argument('--included_region_start', help='start position of subregion', type=int)
     parser.add_argument('--included_region_length', help='length of subregion', type=int)
+    parser.add_argument('--num_of_assays', help='return number of candidate assays from pipeline', type=int)
     parser.add_argument('--mv_cations', help='Concentration of monovalent cations in mM', type=float)
     parser.add_argument('--dv_cations', help='concentration of divalent cations in mM', type=float)
     parser.add_argument('--dntp', help='concentration of dntps in mM [according to primer3 python docs]', type=float)
@@ -191,6 +197,7 @@ if __name__ == "__main__":
     fasta = args.fastafile
     include_reg_start = args.included_region_start
     include_reg_len = args.included_region_length
+    assay_num = args.num_of_assays
 
     # creating SeqIO biopython object
     seq = SeqIO.parse(fasta, 'fasta')
@@ -202,7 +209,9 @@ if __name__ == "__main__":
       be able to handle it.
     '''
     for record in seq:
-        design = primerDesign(record, include_reg_start, include_reg_len)
-        resultdf = genDF(design)
-        selectdf = addCalc(resultdf)
+        design = primerDesign(record, include_reg_start, include_reg_len, assay_num) #design primers
+        resultdf = genDF(design) #transfer designs to a dataframe
+        calcprimdf = addCalc(resultdf) #calculate hetero and homo dimers, and search for restriction sites
+        finalPrim = pickPrimer(calcprimdf) #pick primers
+
 
