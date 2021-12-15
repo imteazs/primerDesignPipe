@@ -3,7 +3,6 @@ import primer3
 from Bio import SeqIO
 import primer3 as primer
 import argparse
-import re
 
 
 def primerDesign(seqRec, start, length):
@@ -40,8 +39,7 @@ def primerDesign(seqRec, start, length):
         'PRIMER_MAX_SELF_END': 8,
         'PRIMER_PAIR_MAX_COMPL_ANY': 12,
         'PRIMER_PAIR_MAX_COMPL_END': 8,
-        'PRIMER_PRODUCT_SIZE_RANGE': [[90, 100]],
-        'PRIMER_MAX_END_GC': 0
+        'PRIMER_PRODUCT_SIZE_RANGE': [[90, 100]]
     }
     oligo = primer.designPrimers(inputDict, designSettings)
     return oligo
@@ -49,39 +47,56 @@ def primerDesign(seqRec, start, length):
 
 def genDF(primerList):
     """
-    Take the primer3 dataframe and parse through it and transfer select data to a
+    Take the primer3 data and parse through it and transfer select data to a
     :param primerList: primer3 dictionary object
     :return: preprocessed dataframe to be ready for further processing
     """
-    data = pd.DataFrame(primerList)
-    data = data.T
-    finalData = pd.DataFrame(columns=['oligo', 'id', 'type', 'oligo_size', 'product_size', 'GC_pct'])
-    for index, row in data.iterrows():
-        rowname_split = row.name.split('_')
+    data = primerList
+    finalData = pd.DataFrame(columns=['id', 'oligo', 'type', 'position', 'primer_len', 'amplicon_size', 'GC_pct'])
+    for key, value in data.items():
+        rowname_split = key.split('_')
 
-        if 'sequence' in row.name.lower():
+        if 'sequence' in key.lower():
             # ['PRIMER', 'LEFT', '0', 'SEQUENCE']
-            nrow = {'oligo' : data[0][index], 'id': rowname_split[2], 'type': rowname_split[1]}
+            nrow = {'oligo' : value, 'id': rowname_split[2], 'type': rowname_split[1]}
             finalData = finalData.append(nrow, ignore_index=True)
 
-        elif 'gc_percent' in row.name.lower():
+        elif 'gc_percent' in key.lower():
             idx = finalData.index[
                 (finalData['type'] == rowname_split[1]) & (finalData['id'] == rowname_split[2])].tolist()
-            finalData['GC_pct'][idx] = data[0][index]
+            finalData['GC_pct'][idx] = value
 
-        elif 'pair' in row.name.lower():
+        elif 'pair' in key.lower():
             idx = finalData.index[finalData['id'] == rowname_split[2]].tolist()
-            finalData['product_size'][idx] = data[0][index]
+            finalData['amplicon_size'][idx] = value
 
-    finalData['primer_len'] = finalData['oligo'].str.len()
+        elif isinstance(value, tuple):
+            idx = finalData.index[
+                (finalData['type'] == rowname_split[1]) & (finalData['id'] == rowname_split[2])].tolist()
+            finalData['position'][idx] = value[0]
+            finalData['primer_len'][idx] = value[1]
+
     return finalData
 
 
 def addCalc(primDF):
+    """
+    start calculating and compiling all the metrics that will be used for primer picking
+    :param primDF: dataframe from the primer pipeline
+    :return: primer after calculations
+    """
+    '''
+    Calculate the homodimer of each oligo and get their deltaG and Tm in C
+    '''
     primDF['Tm_calc'] = primDF['oligo'].apply(primer3.calcTm, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
-    primDF['Homodimer_thermo'] = primDF['oligo'].apply(primer3.calcHomodimer, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200, temp_c=60)
+    primDF['Homodimer_thermo'] = primDF['oligo'].apply(primer3.calcHomodimer, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
     primDF['Homodimer_delG_kcal/mol'] = [i.dg/1000 for i in primDF['Homodimer_thermo'].values]
+    primDF['Homodimer_Tm_C'] = [i.tm for i in primDF['Homodimer_thermo'].values]
 
+    '''
+    Check the oligos for the whether the restriction sites of these enzymes actually exist
+    future plan: drop down menu in shiny app and collapse it all into a list
+    '''
     restrict_enz = {
         'CviAII': ['CATG'],
         'FatI': ['CATG'],
@@ -98,6 +113,42 @@ def addCalc(primDF):
                 primDF[key] = primDF['oligo'].str.contains(item, regex=False)
     primDF['restric_enz_hit'] = primDF[restrict_enz.keys()].any(axis=1)
 
+    '''
+    Count how many Gs and Cs in the last bases of the oligos
+    '''
+    primDF['last_5_base'] = primDF['oligo'].str.slice(start=-5)
+    primDF['3_prime_GC_count_last_5_oligos'] = primDF['last_5_base'].str.count('G') + primDF['last_5_base'].str.count('C')
+
+    '''drop the processing columns'''
+    primDF = primDF.drop(columns=['Homodimer_thermo', 'last_5_base'])
+    primDF = primDF.drop(columns=restrict_enz.keys())
+
+    '''
+    Split the dataframe up into primer type
+    '''
+    left = primDF[primDF['type'] == 'LEFT']
+    left.drop(columns=['type'], inplace=True)
+
+    right = primDF[primDF['type'] == 'RIGHT']
+    right.drop(columns=['type'], inplace=True)
+
+    internal = primDF[primDF['type'] == 'INTERNAL']
+    internal.drop(columns=['type'], inplace=True)
+
+    '''Merge all the data into one assay id per row'''
+    mergedf = left.merge(right, on=['id'], suffixes=['_left', '_right']).merge(internal, on=['id'], suffixes=['_left','_internal'])
+
+    '''
+    Calculate the left and right heterodimers ie forward and reverse deltaG and Tm in C
+    '''
+    mergedf['left_right_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+                                                for i, j in mergedf[['oligo_left', 'oligo_right']].values]
+    mergedf['left_right_heterodimer_kcal/mol'] = [i.dg/1000 for i in mergedf['left_right_heterodimer_thermo'].values]
+    mergedf['left_right_heterodimer_Tm_C'] = [i.tm for i in mergedf['left_right_heterodimer_thermo'].values]
+    mergedf.drop(columns='left_right_heterodimer_thermo', inplace=True)
+    mergedf.to_csv('~/Documents/testdata/final.csv')
+
+    return mergedf
 
 if __name__ == "__main__":
     '''
