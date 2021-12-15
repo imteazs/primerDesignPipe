@@ -118,7 +118,7 @@ def addCalc(primDF):
     primDF['restric_enz_hit'] = primDF[restrict_enz.keys()].any(axis=1)
 
     '''Find more than three repeats'''
-    primDF['3_plus_repeats'] = primDF['oligo'].str.contains(r'((\w)\2{3,})')
+    primDF['3plus_repeats'] = primDF['oligo'].str.contains(r'((\w)\2{3,})')
 
     '''
     Count how many Gs and Cs in the last bases of the oligos
@@ -164,13 +164,13 @@ def addCalc(primDF):
     mergedf['internal_right_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
                                                     for i, j in mergedf[['oligo', 'oligo_right']].values]
     mergedf['right_internal_kcal/mol'] = [i.dg / 1000 for i in mergedf['internal_right_heterodimer_thermo'].values]
-    mergedf['right_internal_Tm_C'] = [i.tm for i in mergedf['internal_right_heterodimer_thermo'].values]
+    mergedf['right_internal_heterodimer_Tm_C'] = [i.tm for i in mergedf['internal_right_heterodimer_thermo'].values]
 
     mergedf.drop(columns=['left_right_heterodimer_thermo', 'left_internal_heterodimer_thermo',
                           'internal_right_heterodimer_thermo'], inplace=True)
 
     mergedf['restric_enz_hit_all'] = mergedf[['restric_enz_hit_left', 'restric_enz_hit_right', 'restric_enz_hit']].any(axis=1)
-    mergedf.to_csv('~/Documents/testdata/final.csv')
+    mergedf['3plus_repeats_all'] = mergedf[['3plus_repeats_left', '3plus_repeats_right', '3plus_repeats']].any(axis=1)
 
     print('Primer calculations completed')
     return mergedf
@@ -180,9 +180,20 @@ def pickPrimer(calcdf):
     #remove rows where the enzymes can hit any sites
     finaldf = calcdf[calcdf['restric_enz_hit_all'] == False]
 
+    #remove G/C clamps in the elimination of G or C sequences greater than 3 in the last 5 bases at 3prime end
+    finaldf = finaldf[(finaldf['3_prime_GC_count_last_5_oligos_left'] < 4) &
+                      (finaldf['3_prime_GC_count_last_5_oligos_right'] < 4) &
+                      (finaldf['3_prime_GC_count_last_5_oligos'] < 4)]
 
+    #remove assays with oligos more than 3 repeats
+    finaldf = finaldf[finaldf['3plus_repeats_all'] == False]
 
-    return None
+    #Remove assays where oligos will make heterodimers in reaction temperature
+    finaldf = finaldf[(finaldf['left_right_heterodimer_Tm_C'] < 51) &
+                      (finaldf['left_internal_heterodimer_Tm_C'] < 51) &
+                      (finaldf['right_internal_heterodimer_Tm_C'] < 51)]
+
+    return finaldf
 
 
 if __name__ == "__main__":
@@ -202,13 +213,14 @@ if __name__ == "__main__":
     parser.add_argument('--dntp', help='concentration of dntps in mM [according to primer3 python docs]', type=float)
     parser.add_argument('--DNA', help='concentration of DNA in nM', type=float)
     parser.add_argument('--anneal_temp', help='annealing temp in C', type=float)
-    parser.add_argument('--out_path', help='Path to output including full file name')
+    parser.add_argument('--out_path', help='Path to save outputs')
 
     args = parser.parse_args()
     fasta = args.fastafile
     include_reg_start = args.included_region_start
     include_reg_len = args.included_region_length
     assay_num = args.num_of_assays
+    outpath = args.out_path
 
     # creating SeqIO biopython object
     seq = SeqIO.parse(fasta, 'fasta')
@@ -223,6 +235,10 @@ if __name__ == "__main__":
         design = primerDesign(record, include_reg_start, include_reg_len, assay_num) #design primers
         resultdf = genDF(design) #transfer designs to a dataframe
         calcprimdf = addCalc(resultdf) #calculate hetero and homo dimers, and search for restriction sites
+        rawfile = outpath + '/' + record.id + '_raw' + '.csv'
+        calcprimdf.to_csv(rawfile)
         finalPrim = pickPrimer(calcprimdf) #pick primers
+        finalfile = outpath + '/' + record.id + '_final' + '.csv'
+        finalPrim.to_csv(finalfile)
 
 
