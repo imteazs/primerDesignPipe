@@ -4,4 +4,4 @@ WORKDIR /primerdesign
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 COPY src/primerPipe.py .
-CMD["python", "primerPipe.py", "-h"]
+CMD ["python", "primerPipe.py", "-h"]
