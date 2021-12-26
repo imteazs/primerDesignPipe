@@ -1,5 +1,4 @@
 import pandas as pd
-import primer3
 from Bio import SeqIO
 import primer3 as primer
 import argparse
@@ -90,10 +89,10 @@ def addCalc(primDF):
     :return: primer after calculations
     """
     '''Calculate the Tm of all oligos in C'''
-    primDF['Tm_calc'] = primDF['oligo'].apply(primer3.calcTm, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+    primDF['Tm_calc'] = primDF['oligo'].apply(primer.calcTm, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
 
     '''Calculate the homodimer of each oligo and get their deltaG and Tm in C'''
-    primDF['Homodimer_thermo'] = primDF['oligo'].apply(primer3.calcHomodimer, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+    primDF['Homodimer_thermo'] = primDF['oligo'].apply(primer.calcHomodimer, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
     primDF['Homodimer_delG_kcal/mol'] = [i.dg/1000 for i in primDF['Homodimer_thermo'].values]
     primDF['Homodimer_Tm_C'] = [i.tm for i in primDF['Homodimer_thermo'].values]
 
@@ -145,19 +144,19 @@ def addCalc(primDF):
 
     '''Calculate the heterodimers ie forward and reverse and probes deltaG and Tm in C'''
     #left and right
-    mergedf['left_right_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+    mergedf['left_right_heterodimer_thermo'] = [primer.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
                                                 for i, j in mergedf[['oligo_left', 'oligo_right']].values]
     mergedf['left_right_heterodimer_kcal/mol'] = [i.dg/1000 for i in mergedf['left_right_heterodimer_thermo'].values]
     mergedf['left_right_heterodimer_Tm_C'] = [i.tm for i in mergedf['left_right_heterodimer_thermo'].values]
 
     #left and probe
-    mergedf['left_internal_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+    mergedf['left_internal_heterodimer_thermo'] = [primer.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
                                                    for i, j in mergedf[['oligo_left', 'oligo']].values]
     mergedf['left_internal_heterodimer_kcal/mol'] = [i.dg / 1000 for i in mergedf['left_internal_heterodimer_thermo'].values]
     mergedf['left_internal_heterodimer_Tm_C'] = [i.tm for i in mergedf['left_internal_heterodimer_thermo'].values]
 
     #right and probe
-    mergedf['internal_right_heterodimer_thermo'] = [primer3.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
+    mergedf['internal_right_heterodimer_thermo'] = [primer.calcHeterodimer(i, j, mv_conc=50, dv_conc=4.7, dntp_conc=0.00095, dna_conc=200)
                                                     for i, j in mergedf[['oligo', 'oligo_right']].values]
     mergedf['right_internal_kcal/mol'] = [i.dg / 1000 for i in mergedf['internal_right_heterodimer_thermo'].values]
     mergedf['right_internal_heterodimer_Tm_C'] = [i.tm for i in mergedf['internal_right_heterodimer_thermo'].values]
